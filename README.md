@@ -28,15 +28,11 @@ py -m pip install requests pandas
 
 2. Run the script:
 ```bash
-# Option 1: Use the batch file (recommended for Windows)
-run_try.bat
+# Run directly with Python (SSL verification is disabled by default)
+py fetchAllData.py
 
-# Option 2: Run directly with Python
-py tryFetchUsingEdgarAPI.py
-
-# Option 3: If behind corporate proxy, set SSL bypass:
-$env:SEC_API_VERIFY_SSL="false"
-py tryFetchUsingEdgarAPI.py
+# For incremental updates (only fetches new data):
+py incrementalUpdate.py
 ```
 
 ## 📁 Output Files
@@ -63,13 +59,21 @@ Edit the `COMPANIES` dictionary to add/remove companies:
 
 ```python
 COMPANIES = {
-    "AXON": "0001069183",
-    "GE": "0000040545",
-    # Add more companies here
+     "Axon Enterprise Inc": "0001069183",
+      "GE Aerospace": "0000040545",
+      "General Dynamics Corporation": "",
+      "Howmet Aerospace Inc": "0000004281",
+      "L3Harris Technologies, Inc": "0000202058",
+      "Lockheed Martin Corporation": "0000936468",
+      "Northrop Grumman Corporation": "0001133421",
+      "RTX Corporation": "0000101829",
+      "The Boeing Company": "0000012927",
+      "TransDigm Group Incorporated": "0001260221"
+  
 }
 ```
 
-**Finding a CIK**: Search for a company on [SEC.gov](https://www.sec.gov/edgar/searchedgar/companysearch.html) and use the CIK number.
+*Finding a CIK**: Search for a company on [SEC.gov](https://www.sec.gov/edgar/searchedgar/companysearch.html) and use the CIK number.
 
 ### Financial Metrics
 
@@ -211,7 +215,7 @@ $env:SEC_API_VERIFY_SSL="false"
 **Solution 1** (Temporary - per session):
 ```powershell
 $env:SEC_API_VERIFY_SSL="false"
-py tryFetchUsingEdgarAPI.py
+py fetchAllData.py
 ```
 
 **Solution 2** (Permanent - recommended):

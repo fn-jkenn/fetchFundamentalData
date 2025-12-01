@@ -2,6 +2,10 @@ import os
 import time
 from typing import Dict, List
 
+# Set SSL verification to false by default (can be overridden by environment variable)
+if "SEC_API_VERIFY_SSL" not in os.environ:
+    os.environ["SEC_API_VERIFY_SSL"] = "false"
+
 import pandas as pd
 import requests
 from requests import Response
@@ -18,7 +22,7 @@ MAX_RETRIES = 3
 RETRY_BACKOFF_SECONDS = 3
 REQUEST_TIMEOUT = 30  # seconds
 
-VERIFY_SSL = os.getenv("SEC_API_VERIFY_SSL", "true").lower() not in {"0", "false", "no"}
+VERIFY_SSL = os.getenv("SEC_API_VERIFY_SSL", "false").lower() not in {"0", "false", "no"}
 CUSTOM_CA_BUNDLE = os.getenv("SEC_API_CA_BUNDLE")
 VERIFY_PARAM = CUSTOM_CA_BUNDLE if (CUSTOM_CA_BUNDLE and VERIFY_SSL) else VERIFY_SSL
 
@@ -189,24 +193,89 @@ def get_all_fundamentals(companies):
 
 
 # --------------------------------------------------------
-# 5. RUN + EXPORT
+# 5. DEDUPLICATION USING PRIMARY KEY
 # --------------------------------------------------------
 
-df_long = get_all_fundamentals(COMPANIES)
-df_long.to_csv("fundamentals_long.csv", index=False)
+def deduplicate_by_primary_key(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Deduplicate using primary key (Ticker + Fiscal Year + Period).
+    For each unique period, keeps only the latest filing (by Filing Date).
+    This ensures no duplicate reporting periods while preserving all metrics.
+    """
+    if df.empty or "Filing Date" not in df.columns:
+        return df
+    
+    df = df.copy()
+    
+    # Build primary key: Ticker + Fiscal Year + Period
+    def build_primary_key(frame):
+        subset = frame[["Ticker", "Fiscal Year", "Period"]].copy()
+        # Normalize Fiscal Year
+        if "Fiscal Year" in subset.columns:
+            fiscal_numeric = pd.to_numeric(subset["Fiscal Year"], errors="coerce")
+            fiscal_str = fiscal_numeric.astype(object)
+            mask_valid = fiscal_numeric.notna()
+            fiscal_str.loc[mask_valid] = fiscal_numeric.loc[mask_valid].astype(int).astype(str)
+            fiscal_str.loc[~mask_valid] = "<NA>"
+            subset["Fiscal Year"] = fiscal_str
+        # Fill NaN and convert to string
+        for col in subset.columns:
+            if col != "Fiscal Year":
+                subset[col] = subset[col].fillna("<NA>").astype(str).str.strip()
+        return subset.agg("||".join, axis=1)
+    
+    df["_primary_key"] = build_primary_key(df)
+    
+    # Convert Filing Date to datetime for comparison
+    df["Filing Date"] = pd.to_datetime(df["Filing Date"], errors="coerce")
+    
+    # For each primary key (ticker/fiscal year/period), keep only rows with latest filing date
+    # Sort by Filing Date descending, then drop duplicates keeping first (latest)
+    df = df.sort_values(["Filing Date", "GAAPTag"], ascending=[False, True], na_position="last")
+    df = df.drop_duplicates(subset=["_primary_key", "GAAPTag"], keep="first")
+    
+    # Convert Filing Date back to string
+    df["Filing Date"] = df["Filing Date"].dt.strftime("%Y-%m-%d")
+    
+    # Drop temporary column
+    df = df.drop(columns=["_primary_key"])
+    
+    return df.reset_index(drop=True)
 
-print("\nSaved long-format dataset -> fundamentals_long.csv")
-print(df_long.head())
 
-# Optional wide pivot table
-df_wide = df_long.pivot_table(
-    index=["Ticker", "Fiscal Year", "Period"],
-    columns="Metric",
-    values="Value",
-    aggfunc="last"
-)
+# --------------------------------------------------------
+# 6. RUN + EXPORT
+# --------------------------------------------------------
 
-df_wide.to_csv("fundamentals_wide.csv")
+def main():
+    df_long = get_all_fundamentals(COMPANIES)
+    
+    # Deduplicate using primary key (keeps latest filing for each period)
+    before_count = len(df_long)
+    df_long = deduplicate_by_primary_key(df_long)
+    after_count = len(df_long)
+    
+    if before_count != after_count:
+        print(f"\n✓ Removed {before_count - after_count} duplicate periods (kept latest filing for each period)")
+    
+    df_long.to_csv("fundamentals_long.csv", index=False)
 
-print("\nSaved wide-format dataset -> fundamentals_wide.csv")
-print(df_wide.head())
+    print(f"\n✓ Saved long-format dataset -> fundamentals_long.csv ({len(df_long)} rows)")
+    print(df_long.head())
+
+    # Optional wide pivot table
+    df_wide = df_long.pivot_table(
+        index=["Ticker", "Fiscal Year", "Period"],
+        columns="Metric",
+        values="Value",
+        aggfunc="last"
+    )
+
+    df_wide.to_csv("fundamentals_wide.csv")
+
+    print(f"\n✓ Saved wide-format dataset -> fundamentals_wide.csv")
+    print(df_wide.head())
+
+
+if __name__ == "__main__":
+    main()

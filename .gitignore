@@ -12,6 +12,8 @@ ENV/
 # Data files (generated outputs)
 *.csv
 fundamentals_*.csv
+*_backup_*.csv
+*.csv.pending
 
 # IDE
 .vscode/
