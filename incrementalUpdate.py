@@ -442,7 +442,16 @@ def rebuild_wide(long_df: pd.DataFrame) -> None:
         values="Value",
         aggfunc="last",
     )
-    df_wide.to_csv(FUNDAMENTALS_WIDE_CSV)
+    
+    # Add Filing Date as a column (get the latest filing date for each period)
+    if "Filing Date" in long_df.columns:
+        filing_dates = long_df.groupby(["Ticker", "Fiscal Year", "Period"])["Filing Date"].max()
+        df_wide["Filing Date"] = df_wide.index.map(lambda x: filing_dates.get(x, None))
+    
+    # Reset index to make Ticker, Fiscal Year, Period regular columns
+    df_wide = df_wide.reset_index()
+    
+    df_wide.to_csv(FUNDAMENTALS_WIDE_CSV, index=False)
     print(f"Rebuilt wide-format dataset -> {FUNDAMENTALS_WIDE_CSV}")
 
 

@@ -326,8 +326,16 @@ def main():
         values="Value",
         aggfunc="last"
     )
+    
+    # Add Filing Date as a column (get the latest filing date for each period)
+    if "Filing Date" in df_long.columns:
+        filing_dates = df_long.groupby(["Ticker", "Fiscal Year", "Period"])["Filing Date"].max()
+        df_wide["Filing Date"] = df_wide.index.map(lambda x: filing_dates.get(x, None))
+    
+    # Reset index to make Ticker, Fiscal Year, Period regular columns
+    df_wide = df_wide.reset_index()
 
-    df_wide.to_csv("fundamentals_wide.csv")
+    df_wide.to_csv("fundamentals_wide.csv", index=False)
 
     print(f"\n✓ Saved wide-format dataset -> fundamentals_wide.csv")
     print(df_wide.head())

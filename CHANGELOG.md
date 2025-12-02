@@ -127,6 +127,21 @@ Major enhancements to SEC EDGAR data fetching system with incremental updates, d
 
 ---
 
+## Recent Additions (Filing Date & Supabase Integration)
+
+- **Wide format enhancement**:
+  - Added `Filing Date` as a column in `fundamentals_wide.csv` (latest filing date per `Ticker + Fiscal Year + Period`).
+  - Implemented in `fetchAllData.py`, `incrementalUpdate.py`, and `fetchHistoricalDataUpTo2024.py`.
+- **Supabase upsert script**:
+  - Added `upsertFundamentalsWideToSupabase.py` to batch upsert wide-format data into Supabase.
+  - Uses composite primary key `(ticker, fiscal_year, period)` for conflict handling.
+  - Normalizes CSV headers (`Ticker`, `Fiscal Year`, `Period`, `Filing Date`) to match table schema.
+  - Loads Supabase credentials from `.env` (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` / `SUPABASE_ANON_KEY`).
+- **Supabase table schema**:
+  - Documented wide-format table `fundamentals_wide` with primary key `(ticker, fiscal_year, period)` and `filing_date` column.
+
+---
+
 ## Key Benefits
 
 ✅ **Efficiency**: Only fetches new data, not entire history  
